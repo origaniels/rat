@@ -1,3 +1,4 @@
+use geo::{Point, Translate};
 pub struct Bullet {
     position: Point,
     win_height: u16,
@@ -6,13 +7,17 @@ pub struct Bullet {
 }
 
 impl Bullet {
-    pub fn new(x: u16, y: u16)->Self {
+    pub fn new(x: f64, y: f64)->Self {
         Self {
-            position: Point {x: x, y: y},
+            position: Point::new(x, y),
             win_height:0,
             win_width: 0,
             offscreen: false
         }
+    }
+
+    pub fn from_point(position: &Point)->Self {
+        Self::new(position.x(), position.y())
     }
 
     pub fn set_frame(&mut self, height: u16, width: u16) {
@@ -21,32 +26,32 @@ impl Bullet {
     }
 
     pub fn up(&mut self) ->(){
-        if self.position.y>0 {
-            self.position.y -= 1;
+        if (self.position.y().trunc() as u16) > 0 {
+            self.position = self.position.translate(0., -1.);
         } else {
             self.offscreen=true;
         }
     }
 
     pub fn down(&mut self) ->(){
-        if self.position.y< self.win_height{
-            self.position.y += 1;
+        if (self.position.y().trunc() as u16) < self.win_height{
+            self.position = self.position.translate(0., 1.);
         } else {
             self.offscreen=true;
         }
     }
 
     pub fn right(&mut self) ->(){
-        if self.position.x<self.win_width {
-            self.position.x += 1;
+        if (self.position.x().trunc() as u16) < self.win_width {
+            self.position = self.position.translate(1., 0.);
         } else {
             self.offscreen=true;
         }
     }
     
     pub fn left(&mut self) ->(){
-        if self.position.x>0 {
-            self.position.x -= 1;
+        if (self.position.x().trunc() as u16) > 0 {
+            self.position = self.position.translate(1., 0.);
         } else {
             self.offscreen=true;
         }
@@ -69,10 +74,13 @@ use ratatui::{
     buffer::Buffer, layout::Rect, style::{Color, Style}, widgets::Widget
 };
 
-use crate::Invader::Point;
-
 impl Widget for BulletSprite<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        buf.set_string(self.position.x, self.position.y+0, "█", Style::default().fg(Color::Red));
+        buf.set_string(
+            self.position.x().trunc() as u16,
+            self.position.y().trunc() as u16,
+            "█",
+            Style::default().fg(Color::Red
+        ));
     }
 }

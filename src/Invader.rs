@@ -1,24 +1,52 @@
-pub struct Point {
-    pub(crate) x: u16,
-    pub(crate) y: u16 
-}
+
+use std::cmp::min;
+
+use ratatui::{
+    buffer::Buffer, crossterm::cursor::position, layout::{Alignment, Rect}, style::{Color, Style, Stylize}, text::{Line, Text}, widgets::{Paragraph, Widget} 
+};
+use crate::Bullet::Bullet;
+use geo::{Point, Translate};
+
 
 pub struct Invader {
     position: Point,
+    target: Point,
     win_height: u16,
-    win_width: u16
+    win_width: u16,
+    speed: f64
 }
 
-pub struct InvaderWidget<'a> {
-    position: &'a Point
+pub struct InvaderWidget {
+    position:(u16, u16)
+}
+
+trait Normalize {
+    fn norm(&self)->f64;
+    fn normalize(&mut self);
+}
+
+impl Normalize for Point {
+    fn norm(& self) ->f64{
+        f64::sqrt(self.x()*self.x() + self.y()*self.x())
+    }
+    fn normalize(&mut self) {
+        let norm:f64 = self.norm();
+        if norm==0.0 {
+            return
+        }
+        *self.x_mut() /= norm;
+        *self.y_mut() /= norm;
+    }
 }
 
 impl Invader {
-    pub fn new(x: u16, y: u16)->Self {
+    pub fn new(x: f64, y: f64)->Self {
         Self {
-            position: Point {x: x, y: y},
+            position: Point::new(x, y),
+            speed: 1.,
             win_height:0,
-            win_width: 0
+            win_width: 0,
+            target: Point::new(x, y)
         }
     }
 
@@ -27,55 +55,78 @@ impl Invader {
         self.win_width = width;
     }
 
-    pub fn shoot(&self, projectile_buff: &mut Vec<Bullet>) {
-        let mut bullet: Bullet = Bullet::new(self.position.x+3, self.position.y);
-        bullet.set_frame(self.win_height, self.win_width);
-        projectile_buff.push(bullet);
+    pub fn set_target(&mut self, x:f64, y: f64) {
+        self.target.set_x(x);
+        self.target.set_y(y);
+    }
+
+    pub fn gravitate(&mut self) {
+        let mut direction = self.target - self.position;
+        direction.normalize();
+        direction *= self.speed;
+        self.position += direction;
+    }
+
+    fn fixed_location(&self) ->(u16, u16) {
+        let mut x = self.position.x().trunc() as u16;
+        let mut y = self.position.y().trunc() as u16;
+        if x<4 {
+            x = 4;
+        } else if x>self.win_width-4 {
+            x = self.win_width-4;
+        }
+
+        if y<3 {
+            y = 3;
+        } else if y>self.win_height-2 {
+            y = self.win_height-2;
+        }
+
+        (x, y)
     }
 
     pub fn up(&mut self) ->(){
-        if self.position.y>0 {
-            self.position.y -= 1;
-        }
+        if (self.position.y().trunc() as u16) > 3 {
+            self.position = self.position.translate(0., -1.);
+        } 
     }
 
     pub fn down(&mut self) ->(){
-        if self.position.y< self.win_height-8{
-            self.position.y += 1;
+        if (self.position.y().trunc() as u16) < self.win_height-2{
+            self.position = self.position.translate(0., 1.);
         }
     }
 
     pub fn right(&mut self) ->(){
-        if self.position.x<self.win_width-8 {
-            self.position.x += 1;
+        if (self.position.x().trunc() as u16) < self.win_width-4 {
+            self.position = self.position.translate(1., 0.);
         }
     }
     
     pub fn left(&mut self) ->(){
-        if self.position.x>0 {
-            self.position.x -= 1;
+        if (self.position.x().trunc() as u16) > 4 {
+            self.position = self.position.translate(1., 0.);
         }
     }
+
     pub fn get_widget(&self)-> InvaderWidget {
-        InvaderWidget {position: &self.position}
+        InvaderWidget {position: self.fixed_location()}
+    }
+    pub fn shoot(&self, projectile_buff: &mut Vec<Bullet>) {
+        let mut bullet: Bullet = Bullet::from_point(&self.position);
+        bullet.set_frame(self.win_height, self.win_width);
+        projectile_buff.push(bullet);
     }
 }
 
-use std::vec;
-
-use ratatui::{
-    buffer::Buffer, crossterm::cursor::position, layout::{Alignment, Rect}, style::{Color, Style, Stylize}, text::{Line, Text}, widgets::{Paragraph, Widget} 
-};
-
-use crate::Bullet::Bullet;
-
-impl Widget for InvaderWidget<'_> {
+impl Widget for InvaderWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        buf.set_string(self.position.x, self.position.y+0, "   ██   ", Style::default());
-        buf.set_string(self.position.x, self.position.y+1, " ██████ ", Style::default());
-        buf.set_string(self.position.x, self.position.y+2, "██ ██ ██", Style::default());
-        buf.set_string(self.position.x, self.position.y+3, "████████", Style::default());
-        buf.set_string(self.position.x, self.position.y+4, " █ ██ █ ", Style::default());
-        buf.set_string(self.position.x, self.position.y+5, "█ █  █ █", Style::default());
+        let (x, y) = self.position;
+        buf.set_string(x-4, y-3, "   ██   ", Style::default());
+        buf.set_string(x-4, y-2, " ██████ ", Style::default());
+        buf.set_string(x-4, y-1, "██ ██ ██", Style::default());
+        buf.set_string(x-4, y+0, "████████", Style::default());
+        buf.set_string(x-4, y+1, " █ ██ █ ", Style::default());
+        buf.set_string(x-4, y+2, "█ █  █ █", Style::default());
     }
 }
