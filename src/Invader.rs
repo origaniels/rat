@@ -1,8 +1,8 @@
 
-use std::cmp::min;
+use std::{cmp::min, fmt::write, io::stdout, path::Display, thread::panicking};
 
 use ratatui::{
-    buffer::Buffer, crossterm::cursor::position, layout::{Alignment, Rect}, style::{Color, Style, Stylize}, text::{Line, Text}, widgets::{Paragraph, Widget} 
+    buffer::Buffer, crossterm::{cursor::position, event, terminal::{disable_raw_mode, LeaveAlternateScreen}, ExecutableCommand}, layout::{Alignment, Rect}, style::{Color, Style, Stylize}, text::{Line, Text}, widgets::{Paragraph, Widget} 
 };
 use crate::Bullet::Bullet;
 use geo::{Point, Translate};
@@ -27,12 +27,26 @@ trait Normalize {
 
 impl Normalize for Point {
     fn norm(& self) ->f64{
-        f64::sqrt(self.x()*self.x() + self.y()*self.x())
+        let res = self.x()*self.x() + self.y()*self.x();
+        if res<1. {
+            0.
+        } else {
+            f64::sqrt(res)
+        }
     }
     fn normalize(&mut self) {
         let norm:f64 = self.norm();
-        if norm==0.0 {
-            return
+        if norm<0.1 {
+            println!("{}, {}", self.x(), self.y());
+            *self.x_mut()=1.;
+            *self.y_mut()=1.;
+            return;
+        }
+        if norm.is_nan() {
+            stdout().execute(event::DisableMouseCapture);
+            stdout().execute(LeaveAlternateScreen);
+            disable_raw_mode();
+            panic!("ahhhhhhhhhh");
         }
         *self.x_mut() /= norm;
         *self.y_mut() /= norm;
@@ -62,8 +76,13 @@ impl Invader {
 
     pub fn gravitate(&mut self) {
         let mut direction = self.target - self.position;
+        if direction.norm()<0.5 {
+            // to small norm induces bad behaviour
+            return;
+        }
         direction.normalize();
         direction *= self.speed;
+
         self.position += direction;
     }
 

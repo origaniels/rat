@@ -51,7 +51,7 @@ fn main() -> Result<()>{
             );
         })?;
 
-        if last_frame.elapsed().as_millis()>16 {
+        if last_frame.elapsed().as_millis()>10 {
             for input in input_events.iter() {
                 match input {
                     
@@ -68,10 +68,9 @@ fn main() -> Result<()>{
             player.gravitate();
         }
 
-        if event::poll(std::time::Duration::from_millis(1))? {
+        if event::poll(std::time::Duration::from_millis(5))? {
             match event::read()? {
                 event::Event::Key(key) => {
-                    println!("key");
                     if key.kind == KeyEventKind::Press {
                         if key.code == KeyCode::Esc {
                             break;
@@ -80,9 +79,10 @@ fn main() -> Result<()>{
                     }
                 },
                 event::Event::Mouse(evt) => {
-                    println!("mouse");
                     if evt.kind == MouseEventKind::Moved {
                         player.set_target(evt.column as f64,evt.row as f64);
+                    } else if evt.kind ==MouseEventKind::Down(event::MouseButton::Left) {
+                        player.shoot(&mut bullets);
                     }
                 },
                 _=>()
